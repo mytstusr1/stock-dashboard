@@ -1,104 +1,84 @@
 <script>
 
-let selected = "NVDA";
-let chartData = [];
+window.onload = function () {
 
-// instant base prices (never depend on API to load UI)
-function basePrice(symbol) {
-  const map = {
-    NVDA: 210,
-    AMD: 150,
-    TSLA: 420,
-    AAPL: 190,
-    MSFT: 400,
-    PLTR: 25
-  };
-  return map[symbol] || 100;
-}
-
-// build chart immediately
-function initChart(price) {
-  chartData = [];
-
-  for (let i = 0; i < 40; i++) {
-    chartData.push(price + Math.random() * 10 - 5);
-  }
-
-  drawChart();
-}
-
-// SAFE chart renderer (never breaks)
-function drawChart() {
   const canvas = document.getElementById("chart");
-
-  if (!canvas) return;
-
   const ctx = canvas.getContext("2d");
 
-  if (!chartData || chartData.length < 2) return;
+  let chartData = [];
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  let max = Math.max(...chartData);
-  let min = Math.min(...chartData);
-
-  // avoid crash if flat line
-  if (max === min) max += 1;
-
-  ctx.strokeStyle = "#22c55e";
-  ctx.beginPath();
-
-  for (let i = 0; i < chartData.length; i++) {
-    let x = (i / (chartData.length - 1)) * canvas.width;
-    let y = canvas.height - ((chartData[i] - min) / (max - min)) * canvas.height;
-
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  function basePrice(symbol) {
+    const map = {
+      NVDA: 210,
+      AMD: 150,
+      TSLA: 420,
+      AAPL: 190,
+      MSFT: 400,
+      PLTR: 25
+    };
+    return map[symbol] || 100;
   }
 
-  ctx.stroke();
-}
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// UI render (sync only)
-function render(symbol, price) {
-  document.getElementById("stockName").innerText = symbol;
-  document.getElementById("price").innerText = "$" + price.toFixed(2);
+    if (chartData.length < 2) return;
 
-  initChart(price);
+    let max = Math.max(...chartData);
+    let min = Math.min(...chartData);
 
-  document.querySelectorAll(".stock").forEach(el => {
-    el.classList.remove("active");
-    if (el.innerText === symbol) el.classList.add("active");
-  });
-}
+    if (max === min) max += 1;
 
-// click handler (NO async, NO blocking)
-function selectStock(symbol) {
-  selected = symbol;
+    ctx.strokeStyle = "#22c55e";
+    ctx.beginPath();
 
-  const price = basePrice(symbol);
-  render(symbol, price);
-}
+    chartData.forEach((p, i) => {
+      let x = (i / (chartData.length - 1)) * canvas.width;
+      let y = canvas.height - ((p - min) / (max - min)) * canvas.height;
 
-// fake live movement (always works)
-setInterval(() => {
-  if (!chartData.length) return;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
 
-  let last = chartData[chartData.length - 1];
-  let next = last + (Math.random() - 0.5) * 3;
+    ctx.stroke();
+  }
 
-  chartData.push(next);
-  chartData.shift();
+  function load(symbol) {
+    document.getElementById("stockName").innerText = symbol;
 
-  drawChart();
+    let price = basePrice(symbol);
 
-  document.getElementById("price").innerText =
-    "$" + next.toFixed(2);
-}, 1000);
+    chartData = [];
 
-// initial load (guaranteed)
-window.onload = () => {
-  selectStock("NVDA");
+    for (let i = 0; i < 40; i++) {
+      chartData.push(price + Math.random() * 8 - 4);
+    }
+
+    draw();
+  }
+
+  window.selectStock = function(symbol) {
+    load(symbol);
+  }
+
+  // initial render
+  load("NVDA");
+
+  // live movement
+  setInterval(() => {
+    if (!chartData.length) return;
+
+    let last = chartData[chartData.length - 1];
+    let next = last + (Math.random() - 0.5) * 2;
+
+    chartData.push(next);
+    chartData.shift();
+
+    document.getElementById("price").innerText = "$" + next.toFixed(2);
+    draw();
+
+  }, 1000);
+
 };
 
 </script>

@@ -3,7 +3,7 @@
 let selected = "NVDA";
 let chartData = [];
 
-// instant fallback (ALWAYS used first)
+// instant base prices (never depend on API to load UI)
 function basePrice(symbol) {
   const map = {
     NVDA: 210,
@@ -16,63 +16,51 @@ function basePrice(symbol) {
   return map[symbol] || 100;
 }
 
-// safe API fetch (non-blocking)
-async function fetchPrice(symbol) {
-  try {
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`
-    );
-    const data = await res.json();
-
-    return data?.quoteResponse?.result?.[0]?.regularMarketPrice
-      ?? basePrice(symbol);
-
-  } catch (e) {
-    return basePrice(symbol);
-  }
-}
-
-// ALWAYS initialize chart instantly
+// build chart immediately
 function initChart(price) {
   chartData = [];
 
   for (let i = 0; i < 40; i++) {
-    chartData.push(price + (Math.random() - 0.5) * 6);
+    chartData.push(price + Math.random() * 10 - 5);
   }
 
   drawChart();
 }
 
-// safe chart render (no empty crash)
+// SAFE chart renderer (never breaks)
 function drawChart() {
   const canvas = document.getElementById("chart");
+
+  if (!canvas) return;
+
   const ctx = canvas.getContext("2d");
 
-  if (!chartData.length) return;
+  if (!chartData || chartData.length < 2) return;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   let max = Math.max(...chartData);
   let min = Math.min(...chartData);
 
-  if (max === min) return;
+  // avoid crash if flat line
+  if (max === min) max += 1;
 
   ctx.strokeStyle = "#22c55e";
   ctx.beginPath();
 
-  chartData.forEach((p, i) => {
-    let x = (i / chartData.length) * canvas.width;
-    let y = canvas.height - ((p - min) / (max - min)) * canvas.height;
+  for (let i = 0; i < chartData.length; i++) {
+    let x = (i / (chartData.length - 1)) * canvas.width;
+    let y = canvas.height - ((chartData[i] - min) / (max - min)) * canvas.height;
 
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
-  });
+  }
 
   ctx.stroke();
 }
 
-// instant UI render (NO waiting)
-function renderStock(symbol, price) {
+// UI render (sync only)
+function render(symbol, price) {
   document.getElementById("stockName").innerText = symbol;
   document.getElementById("price").innerText = "$" + price.toFixed(2);
 
@@ -84,34 +72,33 @@ function renderStock(symbol, price) {
   });
 }
 
-// CLICK HANDLER (fast UI first, real data later)
+// click handler (NO async, NO blocking)
 function selectStock(symbol) {
   selected = symbol;
 
-  const fallback = basePrice(symbol);
-
-  // STEP 1: instant render (NO loading)
-  renderStock(symbol, fallback);
-
-  // STEP 2: async real price update
-  fetchPrice(symbol).then(price => {
-    renderStock(symbol, price);
-  });
+  const price = basePrice(symbol);
+  render(symbol, price);
 }
 
-// LIVE UPDATE LOOP (smooth simulation + refresh real price)
+// fake live movement (always works)
 setInterval(() => {
-  fetchPrice(selected).then(price => {
-    chartData.push(price);
-    chartData.shift();
-    drawChart();
+  if (!chartData.length) return;
 
-    document.getElementById("price").innerText =
-      "$" + price.toFixed(2);
-  });
-}, 7000);
+  let last = chartData[chartData.length - 1];
+  let next = last + (Math.random() - 0.5) * 3;
 
-// INITIAL LOAD (instant, no API wait)
-selectStock("NVDA");
+  chartData.push(next);
+  chartData.shift();
+
+  drawChart();
+
+  document.getElementById("price").innerText =
+    "$" + next.toFixed(2);
+}, 1000);
+
+// initial load (guaranteed)
+window.onload = () => {
+  selectStock("NVDA");
+};
 
 </script>

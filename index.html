@@ -3,9 +3,9 @@
 let selected = "NVDA";
 let chartData = [];
 
-// SAFE fallback price generator (prevents load freeze)
-function fallbackPrice(symbol) {
-  const base = {
+// instant fallback (ALWAYS used first)
+function basePrice(symbol) {
+  const map = {
     NVDA: 210,
     AMD: 150,
     TSLA: 420,
@@ -13,46 +13,42 @@ function fallbackPrice(symbol) {
     MSFT: 400,
     PLTR: 25
   };
-  return base[symbol] || 100;
+  return map[symbol] || 100;
 }
 
-// FIXED fetch with timeout + safe parsing
+// safe API fetch (non-blocking)
 async function fetchPrice(symbol) {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
-
     const res = await fetch(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`,
-      { signal: controller.signal }
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`
     );
-
-    clearTimeout(timeout);
-
     const data = await res.json();
+
     return data?.quoteResponse?.result?.[0]?.regularMarketPrice
-      ?? fallbackPrice(symbol);
+      ?? basePrice(symbol);
 
   } catch (e) {
-    return fallbackPrice(symbol);
+    return basePrice(symbol);
   }
 }
 
-// build chart instantly (NO waiting)
+// ALWAYS initialize chart instantly
 function initChart(price) {
   chartData = [];
 
   for (let i = 0; i < 40; i++) {
-    chartData.push(price + (Math.random() - 0.5) * 8);
+    chartData.push(price + (Math.random() - 0.5) * 6);
   }
+
+  drawChart();
 }
 
-// safe chart drawing (no crash)
+// safe chart render (no empty crash)
 function drawChart() {
   const canvas = document.getElementById("chart");
   const ctx = canvas.getContext("2d");
 
-  if (!chartData || chartData.length === 0) return;
+  if (!chartData.length) return;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -75,13 +71,12 @@ function drawChart() {
   ctx.stroke();
 }
 
-// FAST UI update (non-blocking)
-function updateUI(symbol, price) {
+// instant UI render (NO waiting)
+function renderStock(symbol, price) {
   document.getElementById("stockName").innerText = symbol;
   document.getElementById("price").innerText = "$" + price.toFixed(2);
 
   initChart(price);
-  drawChart();
 
   document.querySelectorAll(".stock").forEach(el => {
     el.classList.remove("active");
@@ -89,21 +84,22 @@ function updateUI(symbol, price) {
   });
 }
 
-// NON-BLOCKING stock select
+// CLICK HANDLER (fast UI first, real data later)
 function selectStock(symbol) {
   selected = symbol;
 
-  // instant UI with fallback (no loading delay)
-  const base = fallbackPrice(symbol);
-  updateUI(symbol, base);
+  const fallback = basePrice(symbol);
 
-  // async real price update in background
+  // STEP 1: instant render (NO loading)
+  renderStock(symbol, fallback);
+
+  // STEP 2: async real price update
   fetchPrice(symbol).then(price => {
-    updateUI(symbol, price);
+    renderStock(symbol, price);
   });
 }
 
-// real-time loop (lightweight)
+// LIVE UPDATE LOOP (smooth simulation + refresh real price)
 setInterval(() => {
   fetchPrice(selected).then(price => {
     chartData.push(price);
@@ -113,9 +109,9 @@ setInterval(() => {
     document.getElementById("price").innerText =
       "$" + price.toFixed(2);
   });
-}, 6000);
+}, 7000);
 
-// initial load (instant)
+// INITIAL LOAD (instant, no API wait)
 selectStock("NVDA");
 
 </script>

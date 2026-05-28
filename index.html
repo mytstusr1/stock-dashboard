@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Real-Time Stock Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      display: flex;
+      height: 100vh;
+      background: #0f172a;
+      color: white;
+    }
+
+    .sidebar {
+      width: 260px;
+      background: #0b1220;
+      padding: 10px;
+      border-right: 1px solid #1f2937;
+    }
+
+    .stock {
+      padding: 10px;
+      margin: 6px 0;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    .stock:hover { background: #1f2937; }
+    .active { background: #1f2937; }
+
+    .main {
+      flex: 1;
+      padding: 20px;
+    }
+
+    canvas {
+      background: #0b1220;
+      border: 1px solid #1f2937;
+      margin-top: 20px;
+    }
+
+    .price {
+      font-size: 26px;
+      margin-top: 5px;
+      color: #22c55e;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h3>Live Watchlist</h3>
+
+  <div class="stock active" onclick="selectStock('NVDA')">NVDA</div>
+  <div class="stock" onclick="selectStock('AMD')">AMD</div>
+  <div class="stock" onclick="selectStock('TSLA')">TSLA</div>
+  <div class="stock" onclick="selectStock('AAPL')">AAPL</div>
+  <div class="stock" onclick="selectStock('MSFT')">MSFT</div>
+  <div class="stock" onclick="selectStock('PLTR')">PLTR</div>
+</div>
+
+<div class="main">
+  <h2 id="stockName">NVDA</h2>
+  <div class="price" id="price">Loading...</div>
+
+  <canvas id="chart" width="800" height="400"></canvas>
+</div>
+
+<script>
+
+let selected = "NVDA";
+let chartData = [];
+
+// FREE API (Yahoo Finance proxy)
+async function fetchPrice(symbol) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    return data.quoteResponse.result[0].regularMarketPrice;
+  } catch (e) {
+    return null;
+  }
+}
+
+// build initial chart
+function initChart(price) {
+  chartData = [];
+  for (let i = 0; i < 40; i++) {
+    chartData.push(price + (Math.random() - 0.5) * 10);
+  }
+}
+
+function drawChart() {
+  const canvas = document.getElementById("chart");
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let max = Math.max(...chartData);
+  let min = Math.min(...chartData);
+
+  ctx.strokeStyle = "#22c55e";
+  ctx.beginPath();
+
+  chartData.forEach((p, i) => {
+    let x = (i / chartData.length) * canvas.width;
+    let y = canvas.height - ((p - min) / (max - min)) * canvas.height;
+
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+
+  ctx.stroke();
+}
+
+async function updatePrice() {
+  const price = await fetchPrice(selected);
+
+  if (!price) return;
+
+  document.getElementById("price").innerText = "$" + price.toFixed(2);
+
+  // update chart (shift like live feed)
+  chartData.push(price + (Math.random() - 0.5) * 2);
+  chartData.shift();
+
+  drawChart();
+}
+
+async function selectStock(symbol) {
+  selected = symbol;
+  document.getElementById("stockName").innerText = symbol;
+
+  const price = await fetchPrice(symbol);
+  if (price) initChart(price);
+
+  drawChart();
+
+  document.querySelectorAll(".stock").forEach(el => {
+    el.classList.remove("active");
+    if (el.innerText === symbol) el.classList.add("active");
+  });
+}
+
+// initial load
+selectStock("NVDA");
+
+// REAL-TIME UPDATE LOOP
+setInterval(updatePrice, 5000);
+
+</script>
+
+</body>
+</html>
